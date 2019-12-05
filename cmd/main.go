@@ -5,31 +5,36 @@ import (
 	"log"
 	"os"
 	"sync"
-	"time"
 
 	"github.com/SUMUKHA-PK/Raft-Distributed-Consensus/servermanagement"
 	"github.com/SUMUKHA-PK/Raft-Distributed-Consensus/types"
 )
 
 func main() {
-	file, err := os.Open("server.config.json")
-	if err != nil {
-		log.Panic("Error reading from config file!")
-	}
-	decoder := json.NewDecoder(file)
-	var configuration types.Configuration
-	err = decoder.Decode(&configuration)
-	if err != nil {
-		log.Panic("Error decoding config file!")
-	}
-	RaftServers := make(map[string]types.RaftServer)
+	raftServers := make(map[string]types.RaftServer)
+	configuration := initializeConfiguration("server.config.json")
+
 	wg := &sync.WaitGroup{}
 	wg.Add(2)
 	go servermanagement.StartServers(configuration)
-	go func() {
-		time.Sleep(1 * time.Millisecond)
-		servermanagement.StartSignal(configuration, RaftServers)
-		wg.Done()
-	}()
+	go servermanagement.StartSignal(configuration, raftServers, 1, wg)
 	wg.Wait()
+}
+
+func initializeConfiguration(filepath string) types.Configuration {
+	file, err := os.Open(filepath)
+
+	if err != nil {
+		log.Panic("Error reading from %v: %v", filepath, err)
+	}
+
+	var configuration types.Configuration
+
+	err = json.NewDecoder(file).Decode(&configuration)
+
+	if err != nil {
+		log.Panic("Error decoding %v: %v", filepath, err)
+	}
+
+	return configuration
 }

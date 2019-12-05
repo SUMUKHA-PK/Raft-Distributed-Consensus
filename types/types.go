@@ -28,3 +28,11 @@ type RaftServer struct {
 	// send out data to necessary servers.
 	DesignationMap map[string]string `json:"designationMap"`
 }
+
+func (s *Server) URI() string {
+	return s.IP + ":" + s.Port
+}
+
+func (s *Server) URL(protocol, endpoint string) string {
+	return protocol + s.URI() + "/" + endpoint
+}

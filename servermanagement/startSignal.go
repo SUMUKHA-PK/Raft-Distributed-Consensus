@@ -6,47 +6,57 @@ import (
 	"net/http"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/SUMUKHA-PK/Raft-Distributed-Consensus/types"
 )
 
-// StartSignal initiates the servers to behave
-// according to the raft protocol.
-func StartSignal(config types.Configuration, RaftServers map[string]types.RaftServer) error {
-	wg := &sync.WaitGroup{}
-	wg.Add(len(config.Servers))
-	designationMap := make(map[string]string)
-	for i := range config.Servers {
-		designationMap[config.Servers[i].IP+":"+config.Servers[i].Port] = "follower"
+// StartSignal initialises raft server instances and sends out signal to initiate leader election
+func StartSignal(config types.Configuration, raftServers map[string]types.RaftServer, delay time.Duration, wg *sync.WaitGroup) error {
+	serverDesignations := make(map[string]string)
+	for _, server := range config.Servers {
+		serverDesignations[server.URI()] = "follower"
 	}
-	for i := range config.Servers {
-		RaftServers[config.Servers[i].IP+":"+config.Servers[i].Port] = types.RaftServer{"follower", config.Servers[i].IP, config.Servers[i].Port, designationMap}
+
+	for _, server := range config.Servers {
+		raftServers[server.URI()] = types.RaftServer{"follower", server.IP, server.Port, serverDesignations}
 	}
-	payload, err := json.Marshal(RaftServers)
+
+	payload, err := json.Marshal(raftServers)
 	if err != nil {
-		log.Printf("Can't Marshall to JSON in startSignal.go : %v\n", err)
+		log.Fatal("Can't Marshall Payload to JSON in startSignal.go: %v\n", err)
 		return err
 	}
-	for i := range config.Servers {
-		URL := "http://" + config.Servers[i].IP + ":" + config.Servers[i].Port + "/startRaft"
-		go func(i int) error {
-			req, err := http.NewRequest("POST", URL, strings.NewReader(string(payload))) //strings.NewReader(string(payload)))
-			if err != nil {
-				log.Printf("Bad request in startSignal.go : %v\n", err)
-				return err
-			}
-			req.Header.Add("Content-Type", "application/json")
 
-			res, err := http.DefaultClient.Do(req)
-			if err != nil {
-				log.Printf("Bad response in startSignal.go: %v\n", err)
-				return err
-			}
-			defer res.Body.Close()
-			wg.Done()
-			return nil
-		}(i)
+	time.Sleep(delay * time.Millisecond)
+	sendInitiateSignals(config.Servers, payload)
+
+	wg.Done()
+	return nil
+}
+
+func sendInitiateSignals(servers []types.Server, payload []byte) {
+	for _, server := range servers {
+		go sendInitiateSignal(server.URL("http://", "startRaft"), strings.NewReader(string(payload)))
 	}
-	wg.Wait()
+}
+
+func sendInitiateSignal(URL string, payload *strings.Reader) error {
+	req, err := http.NewRequest("POST", URL, payload)
+	req.Header.Add("Content-Type", "application/json")
+
+	if err != nil {
+		log.Printf("Bad request for %v while sending start signal: %v\n", URL, err)
+		return err
+	}
+
+	res, err := http.DefaultClient.Do(req)
+
+	if err != nil {
+		log.Printf("Bad response from %v while sending start signal: %v\n", URL, err)
+		return err
+	}
+
+	res.Body.Close()
 	return nil
 }
