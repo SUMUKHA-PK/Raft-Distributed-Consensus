@@ -79,7 +79,22 @@ type URLResponse struct {
 	Res *http.Response `json:"res"`
 }
 
-// Builds a Configuration using filepath
+// ReqVotesRequest represents a requestVote request structure
+type ReqVotesRequest struct {
+	Data         Configuration `json:"data"`
+	Term         int           `json:"term"`
+	CandidateID  int           `json:"candidateID"`
+	LastLogIndex int           `json:"lastLogIndex"`
+	LastLogTerm  int           `json:"lastLogTerm"`
+}
+
+// AppendEntriesReq represents an AppendEntires request
+type AppendEntriesReq struct {
+	Data     LogData
+	ServerID int
+}
+
+// BuildConfigurationFromConfigFile builds a Configuration using filepath
 func BuildConfigurationFromConfigFile(filepath string) (Configuration, error) {
 	file, err := os.Open(filepath)
 	if err != nil {
@@ -95,7 +110,7 @@ func BuildConfigurationFromConfigFile(filepath string) (Configuration, error) {
 	return Configuration{servers}, nil
 }
 
-// Maps IP to Current State of Server
+// BuildServerData maps IP to Current State of Server
 func BuildServerData(config Configuration) map[string]*State {
 	serverData := make(map[string]*State)
 	for i, server := range config.Servers {

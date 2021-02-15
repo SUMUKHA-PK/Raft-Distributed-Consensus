@@ -39,5 +39,12 @@ func StartRaft(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.Write([]byte(outJSON))
 
-	leaderelection.LeaderElection(newReq[r.Host].Config, r.Host)
+	for {
+		if types.ServerData[r.Host].VotedFor == -2 {
+			leaderelection.LeaderElection(newReq[r.Host].Config, r.Host)
+		} else {
+			break
+		}
+	}
+
 }
